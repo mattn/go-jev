@@ -77,6 +77,10 @@ go install github.com/mattn/go-jev/cmd/jev-cli@latest
 export TYPESAFE_API_KEY=...
 ```
 
+Prebuilt binaries for Linux, macOS and Windows (amd64 / arm64) are on the
+[releases page](https://github.com/mattn/go-jev/releases). `make build` builds
+from a checkout.
+
 ```sh
 # yes/no → probability 0..1
 echo 'Help! My payouts have been failing for 3 days.' | jev-cli noul 'Does this convey urgency?'

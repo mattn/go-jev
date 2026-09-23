@@ -44,6 +44,9 @@ environment:
 exit status: 0 ok / yes, 1 no (noul -q, grep without match), 2 error
 `
 
+// revision is set by -ldflags "-X main.revision=...".
+var revision = "HEAD"
+
 // errNo is returned for a well-formed "no" (noul -q, grep without match).
 var errNo = errors.New("no")
 
@@ -71,7 +74,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	case "ask":
 		cmd = cmdAsk
 	case "version", "-version", "--version":
-		fmt.Fprintln(stdout, "jev-cli", jev.Version)
+		fmt.Fprintf(stdout, "jev-cli %s (rev: %s)\n", jev.Version, revision)
 		return 0
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)

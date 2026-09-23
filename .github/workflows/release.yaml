@@ -1,0 +1,59 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      # pure Go: cross compile everything from one runner
+      - name: Build
+        env:
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*}
+            arch=${target#*/}
+            name=jev-cli_${{ github.ref_name }}_${os}_${arch}
+            ext=; [ "$os" = windows ] && ext=.exe
+            mkdir -p "dist/$name"
+            GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X main.revision=${GITHUB_SHA::7}" \
+              -o "dist/$name/jev-cli$ext" ./cmd/jev-cli
+            cp README.md LICENSE "dist/$name/"
+            if [ "$os" = windows ] || [ "$os" = darwin ]; then
+              (cd dist && zip -qr "$name.zip" "$name")
+            else
+              tar -C dist -czf "dist/$name.tar.gz" "$name"
+            fi
+          done
+          (cd dist && sha256sum *.zip *.tar.gz > SHA256SUMS)
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: jev-cli ${{ github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: false
+          generate_release_notes: true
+          files: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/SHA256SUMS
