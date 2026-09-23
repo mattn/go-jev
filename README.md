@@ -1,18 +1,70 @@
 # go-jev
 
-Command-line tool and Go client for [TypeSafe Jev](https://docs.typesafe.ai/),
-a decision-only model that returns typed answers (yes/no probability, choice,
-score) instead of text. Built to sit in UNIX pipelines: the state is read from
-stdin, answers go to stdout, and yes/no is also an exit status.
+Go SDK for [TypeSafe Jev](https://docs.typesafe.ai/), a decision-only model
+that returns typed answers (yes/no probability, choice, score) instead of
+text. Comes with `jev`, a command-line tool built on it for UNIX pipelines.
 
 ## Install
+
+```sh
+go get github.com/mattn/go-jev
+```
+
+## Usage
+
+```go
+import "github.com/mattn/go-jev"
+
+c := jev.NewClient() // TYPESAFE_API_KEY, JEV_MODEL, JEV_API_URL, JEV_TIMEOUT
+
+// one question
+a, err := c.Ask(ctx, "Help! My payouts have been failing for 3 days.", jev.Question{
+	Type:         "choice",
+	Instructions: "Which team should handle this?",
+	Criteria: jev.Options{ // keeps option order
+		{Name: "billing", Desc: "Payments, invoicing, refunds"},
+		{Name: "technical", Desc: "Bugs, outages, integrations"},
+		{Name: "sales"}, // nil Desc is sent as null
+	},
+})
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Println(a.Choice, a.Confidence, a.Probabilities)
+
+// several questions in one request; state may be any JSON value
+resp, err := c.Evaluate(ctx, map[string]any{"from": "alice", "text": "refund me"},
+	map[string]jev.Question{
+		"urgent":      {Type: "noul", Instructions: "Is this urgent?"},
+		"frustration": {Type: "score", Instructions: "How frustrated?", Criteria: []string{"Calm", "Frustrated", "Very angry"}},
+	})
+if err != nil {
+	log.Fatal(err)
+}
+fmt.Println(resp.Answers["urgent"].Noul, resp.Answers["frustration"].Score)
+```
+
+| | |
+|---|---|
+| `NewClient()` | client configured from the environment (see [Configuration](#configuration)) |
+| `Client.Ask(ctx, state, q)` | one `Question` → `*Answer` |
+| `Client.Evaluate(ctx, state, questions)` | a questions map → `*Response` (`Answers`, `Usage`, `Raw`) |
+| `Question` | `Type` (`"noul"`, `"choice"`, `"score"`), `Instructions`, `Criteria` |
+| `Options` | ordered choice criteria |
+| `Answer` | `Noul`, `Choice`, `Score`, `Legend`, `Probabilities`, `Confidence`, `Raw` |
+| `*APIError` | non-2xx response (`Status`, `Body`) |
+| `Endpoint(addr)` | expands `localhost:8080` to `http://localhost:8080/v1/systemone` |
+
+`state`, `Instructions` and `Criteria` take any value that marshals to JSON;
+a `json.RawMessage` is sent verbatim. `429` and `529` are retried with
+exponential backoff (`Client.MaxRetries`, default 3).
+
+## Command-line tool
 
 ```sh
 go install github.com/mattn/go-jev/cmd/jev@latest
 export TYPESAFE_API_KEY=...
 ```
-
-## Usage
 
 ```sh
 # yes/no → probability 0..1
@@ -87,18 +139,6 @@ local [tensai](https://github.com/mattn/tensai) server works as is:
 
 ```sh
 JEV_API_URL=localhost:8080 jev choice -s '金曜の夜、友人と居酒屋' 'いま何を飲む？' コーヒー ビール 紅茶
-```
-
-## Go package
-
-```go
-c := jev.NewClient() // configured from the environment
-a, err := c.Ask(ctx, "Help! My payouts have been failing.", jev.Question{
-	Type:         "choice",
-	Instructions: "Which team should handle this?",
-	Criteria:     jev.Options{{Name: "billing"}, {Name: "technical"}},
-})
-fmt.Println(a.Choice, a.Confidence)
 ```
 
 ## License

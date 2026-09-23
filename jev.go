@@ -1,4 +1,4 @@
-// Package jev is a small client for TypeSafe's Jev (System One) API, a
+// Package jev is a Go SDK for TypeSafe's Jev (System One) API, a
 // decision-only model that returns typed answers (yes/no probability, choice,
 // score) instead of text.
 package jev
