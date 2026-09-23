@@ -15,7 +15,7 @@ go get github.com/mattn/go-jev
 ```go
 import "github.com/mattn/go-jev"
 
-c := jev.NewClient() // TYPESAFE_API_KEY, JEV_MODEL, JEV_API_URL, JEV_TIMEOUT
+c := jev.NewClient(jev.WithAPIKey(os.Getenv("TYPESAFE_API_KEY")))
 
 // one question
 a, err := c.Ask(ctx, "Help! My payouts have been failing for 3 days.", jev.Question{
@@ -46,7 +46,12 @@ fmt.Println(resp.Answers["urgent"].Noul, resp.Answers["frustration"].Score)
 
 | | |
 |---|---|
-| `NewClient()` | client configured from the environment (see [Configuration](#configuration)) |
+| `NewClient(opts...)` | client for the TypeSafe API; the package reads no environment variables |
+| `WithAPIKey(key)` | API key; without one no `Authorization` header is sent |
+| `WithModel(name)` | model (default `jev-latest`) |
+| `WithURL(url)` | endpoint, as given (default `https://api.typesafe.ai/v1/systemone`) |
+| `WithTimeout(d)` | limit per request including retries (default 60s, 0 = none) |
+| `WithHTTPClient(hc)`, `WithMaxRetries(n)` | HTTP client, retries on 429 / 529 (default 3) |
 | `Client.Ask(ctx, state, q)` | one `Question` → `*Answer` |
 | `Client.Evaluate(ctx, state, questions)` | a questions map → `*Response` (`Answers`, `Usage`, `Raw`) |
 | `Question` | `Type` (`"noul"`, `"choice"`, `"score"`), `Instructions`, `Criteria` |
@@ -57,7 +62,13 @@ fmt.Println(resp.Answers["urgent"].Noul, resp.Answers["frustration"].Score)
 
 `state`, `Instructions` and `Criteria` take any value that marshals to JSON;
 a `json.RawMessage` is sent verbatim. `429` and `529` are retried with
-exponential backoff (`Client.MaxRetries`, default 3).
+exponential backoff.
+
+A local [tensai](https://github.com/mattn/tensai) server speaks the same API:
+
+```go
+c := jev.NewClient(jev.WithURL(jev.Endpoint("localhost:8080")))
+```
 
 ## Command-line tool
 
@@ -133,7 +144,9 @@ With `-l`, a failed line is reported on stderr and the rest continue.
 | `JEV_API_URL` | `https://api.typesafe.ai/v1/systemone` |
 | `JEV_TIMEOUT` | `60` (seconds) |
 
-These match [sqlite3-jev](https://github.com/mattn/sqlite3-jev). A bare host
+The `jev` command reads these and passes them to the client; flags
+(`-model`, `-url`, `-timeout`) override them. They match
+[sqlite3-jev](https://github.com/mattn/sqlite3-jev). A bare host
 such as `localhost:8080` expands to `http://localhost:8080/v1/systemone`, so a
 local [tensai](https://github.com/mattn/tensai) server works as is:
 

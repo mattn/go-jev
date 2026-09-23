@@ -161,16 +161,7 @@ func (e *env) parse(args []string) ([]string, error) {
 		pos, args = append(pos, rest[0]), rest[1:]
 	}
 
-	e.client = jev.NewClient()
-	if e.model != "" {
-		e.client.Model = e.model
-	}
-	if e.url != "" {
-		e.client.URL = jev.Endpoint(e.url)
-	}
-	if e.timeout > 0 {
-		e.client.HTTPClient.Timeout = e.timeout
-	}
+	e.client = jev.NewClient(e.clientOptions()...)
 	if e.parallel < 1 {
 		e.parallel = 1
 	}
@@ -178,6 +169,35 @@ func (e *env) parse(args []string) ([]string, error) {
 		return nil, errors.New("-l and -s cannot be used together")
 	}
 	return pos, nil
+}
+
+// clientOptions builds the client configuration from the environment,
+// overridden by flags.
+func (e *env) clientOptions() []jev.ClientOption {
+	opts := []jev.ClientOption{jev.WithAPIKey(os.Getenv("TYPESAFE_API_KEY"))}
+	model, url := e.model, e.url
+	if model == "" {
+		model = os.Getenv("JEV_MODEL")
+	}
+	if model != "" {
+		opts = append(opts, jev.WithModel(model))
+	}
+	if url == "" {
+		url = os.Getenv("JEV_API_URL")
+	}
+	if url != "" {
+		opts = append(opts, jev.WithURL(jev.Endpoint(url)))
+	}
+	timeout := e.timeout
+	if timeout <= 0 {
+		if n, err := strconv.Atoi(os.Getenv("JEV_TIMEOUT")); err == nil && n > 0 {
+			timeout = time.Duration(n) * time.Second
+		}
+	}
+	if timeout > 0 {
+		opts = append(opts, jev.WithTimeout(timeout))
+	}
+	return opts
 }
 
 func (e *env) usageErr(format string, a ...any) error {

@@ -10,8 +10,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -23,36 +21,61 @@ const (
 	Version        = "0.0.1"
 )
 
-// Client calls the Jev API. The zero value is not usable; use NewClient.
+// Client calls the Jev API. Create one with NewClient.
 type Client struct {
-	APIKey     string // no Authorization header is sent when empty
-	Model      string
-	URL        string
-	HTTPClient *http.Client
-	MaxRetries int // retries on 429 / 529
+	apiKey     string
+	model      string
+	url        string
+	httpClient *http.Client
+	timeout    time.Duration
+	maxRetries int
 }
 
-// NewClient returns a client configured from TYPESAFE_API_KEY, JEV_MODEL,
-// JEV_API_URL and JEV_TIMEOUT (seconds).
-func NewClient() *Client {
+// ClientOption configures a Client.
+type ClientOption func(*Client)
+
+// WithAPIKey sets the API key. Without one no Authorization header is sent,
+// which suits open servers such as `tensai serve`.
+func WithAPIKey(key string) ClientOption { return func(c *Client) { c.apiKey = key } }
+
+// WithModel sets the model (default DefaultModel).
+func WithModel(model string) ClientOption { return func(c *Client) { c.model = model } }
+
+// WithURL sets the endpoint URL as given (default DefaultURL). Use Endpoint to
+// expand a bare address such as "localhost:8080".
+func WithURL(url string) ClientOption { return func(c *Client) { c.url = url } }
+
+// WithHTTPClient sets the HTTP client (default http.DefaultClient).
+func WithHTTPClient(hc *http.Client) ClientOption { return func(c *Client) { c.httpClient = hc } }
+
+// WithTimeout limits each request, including retries (default DefaultTimeout;
+// 0 means no limit).
+func WithTimeout(d time.Duration) ClientOption { return func(c *Client) { c.timeout = d } }
+
+// WithMaxRetries sets how many times 429 / 529 responses are retried with
+// exponential backoff (default 3).
+func WithMaxRetries(n int) ClientOption { return func(c *Client) { c.maxRetries = n } }
+
+// NewClient returns a client for the TypeSafe API, configured by opts.
+func NewClient(opts ...ClientOption) *Client {
 	c := &Client{
-		APIKey:     os.Getenv("TYPESAFE_API_KEY"),
-		Model:      DefaultModel,
-		URL:        DefaultURL,
-		HTTPClient: &http.Client{Timeout: DefaultTimeout},
-		MaxRetries: 3,
+		model:      DefaultModel,
+		url:        DefaultURL,
+		httpClient: http.DefaultClient,
+		timeout:    DefaultTimeout,
+		maxRetries: 3,
 	}
-	if v := os.Getenv("JEV_MODEL"); v != "" {
-		c.Model = v
-	}
-	if v := os.Getenv("JEV_API_URL"); v != "" {
-		c.URL = Endpoint(v)
-	}
-	if v, err := strconv.Atoi(os.Getenv("JEV_TIMEOUT")); err == nil && v > 0 {
-		c.HTTPClient.Timeout = time.Duration(v) * time.Second
+	for _, opt := range opts {
+		opt(c)
 	}
 	return c
 }
+
+// Model returns the model the client sends.
+func (c *Client) Model() string { return c.model }
+
+// URL returns the endpoint the client posts to.
+func (c *Client) URL() string { return c.url }
 
 // Endpoint normalizes a server address: "localhost:8080" or "http://host/"
 // become "http://host:port/v1/systemone", so any Jev-compatible server (such
@@ -164,7 +187,7 @@ func (c *Client) Evaluate(ctx context.Context, state, questions any) (*Response,
 		State     any    `json:"state"`
 		Model     string `json:"model"`
 		Questions any    `json:"questions"`
-	}{state, c.Model, questions})
+	}{state, c.model, questions})
 	if err != nil {
 		return nil, err
 	}
@@ -194,22 +217,23 @@ func (c *Client) Ask(ctx context.Context, state any, q Question) (*Answer, error
 }
 
 func (c *Client) post(ctx context.Context, body []byte) ([]byte, error) {
-	hc := c.HTTPClient
-	if hc == nil {
-		hc = http.DefaultClient
+	if c.timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, c.timeout)
+		defer cancel()
 	}
 	for attempt := 0; ; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.URL, bytes.NewReader(body))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url, bytes.NewReader(body))
 		if err != nil {
 			return nil, err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("User-Agent", "go-jev/"+Version)
-		if c.APIKey != "" {
-			req.Header.Set("Authorization", "Bearer "+c.APIKey)
+		if c.apiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+c.apiKey)
 		}
-		resp, err := hc.Do(req)
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -220,7 +244,7 @@ func (c *Client) post(ctx context.Context, body []byte) ([]byte, error) {
 		}
 		switch {
 		case resp.StatusCode == 429 || resp.StatusCode == 529:
-			if attempt >= c.MaxRetries {
+			if attempt >= c.maxRetries {
 				return nil, &APIError{resp.StatusCode, string(data)}
 			}
 			select {
