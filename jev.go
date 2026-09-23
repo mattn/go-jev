@@ -18,7 +18,7 @@ const (
 	DefaultModel   = "jev-latest"
 	DefaultURL     = "https://api.typesafe.ai/v1/systemone"
 	DefaultTimeout = 60 * time.Second
-	Version        = "0.0.1"
+	Version        = "0.0.2"
 )
 
 // Client calls the Jev API. Create one with NewClient.
