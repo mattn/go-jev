@@ -128,7 +128,7 @@ func TestCommands(t *testing.T) {
 	for _, tt := range tests {
 		out, errs, code := runJev(tt.stdin, tt.args...)
 		if out != tt.out || code != tt.code {
-			t.Errorf("jev %q: got %q (exit %d), want %q (exit %d); stderr: %s", tt.args, out, code, tt.out, tt.code, errs)
+			t.Errorf("jev-cli %q: got %q (exit %d), want %q (exit %d); stderr: %s", tt.args, out, code, tt.out, tt.code, errs)
 		}
 	}
 

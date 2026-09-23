@@ -1,7 +1,7 @@
-// Command jev calls TypeSafe Jev from the shell.
+// Command jev-cli calls TypeSafe Jev from the shell.
 //
 //	echo 'Help! My payouts have been failing for 3 days.' |
-//	  jev choice 'Which team should handle this?' billing technical sales
+//	  jev-cli choice 'Which team should handle this?' billing technical sales
 package main
 
 import (
@@ -22,7 +22,7 @@ import (
 	"github.com/mattn/go-jev"
 )
 
-const usage = `usage: jev <command> [flags] args...
+const usage = `usage: jev-cli <command> [flags] args...
 
 commands:
   noul   QUESTION                 probability (0..1) that the answer is yes
@@ -33,7 +33,7 @@ commands:
   version
 
 The state (the text to judge) is read from stdin, or given with -s.
-Run 'jev <command> -h' for the flags of each command.
+Run 'jev-cli <command> -h' for the flags of each command.
 
 environment:
   TYPESAFE_API_KEY  API key (no Authorization header when unset)
@@ -71,13 +71,13 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	case "ask":
 		cmd = cmdAsk
 	case "version", "-version", "--version":
-		fmt.Fprintln(stdout, "jev", jev.Version)
+		fmt.Fprintln(stdout, "jev-cli", jev.Version)
 		return 0
 	case "help", "-h", "-help", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
 	default:
-		fmt.Fprintf(stderr, "jev: unknown command %q\n\n%s", args[0], usage)
+		fmt.Fprintf(stderr, "jev-cli: unknown command %q\n\n%s", args[0], usage)
 		return 2
 	}
 	e := &env{name: args[0], stdin: stdin, stdout: bufio.NewWriter(stdout), stderr: stderr}
@@ -92,7 +92,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		return 0
 	default:
 		if msg := err.Error(); msg != "" {
-			fmt.Fprintf(stderr, "jev %s: %v\n", e.name, err)
+			fmt.Fprintf(stderr, "jev-cli %s: %v\n", e.name, err)
 		}
 		return 2
 	}
@@ -118,10 +118,10 @@ type env struct {
 }
 
 func (e *env) flags(synopsis string) *flag.FlagSet {
-	fs := flag.NewFlagSet("jev "+e.name, flag.ContinueOnError)
+	fs := flag.NewFlagSet("jev-cli "+e.name, flag.ContinueOnError)
 	fs.SetOutput(e.stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(e.stderr, "usage: jev %s [flags] %s\n\nflags:\n", e.name, synopsis)
+		fmt.Fprintf(e.stderr, "usage: jev-cli %s [flags] %s\n\nflags:\n", e.name, synopsis)
 		fs.PrintDefaults()
 	}
 	fs.Func("s", "state `text` (default: read stdin)", func(s string) error {
@@ -201,7 +201,7 @@ func (e *env) clientOptions() []jev.ClientOption {
 }
 
 func (e *env) usageErr(format string, a ...any) error {
-	fmt.Fprintf(e.stderr, "jev %s: "+format+"\n", append([]any{e.name}, a...)...)
+	fmt.Fprintf(e.stderr, "jev-cli %s: "+format+"\n", append([]any{e.name}, a...)...)
 	e.fs.Usage()
 	return errors.New("")
 }
@@ -313,7 +313,7 @@ func (e *env) each(ctx context.Context, fn func(context.Context, any) result, em
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
-			fmt.Fprintf(e.stderr, "jev %s: line %d: %v\n", e.name, j.n, r.err)
+			fmt.Fprintf(e.stderr, "jev-cli %s: line %d: %v\n", e.name, j.n, r.err)
 			failed++
 			continue
 		}
@@ -430,7 +430,7 @@ func cmdNoul(ctx context.Context, e *env, args []string) error {
 		return e.usageErr("need exactly one QUESTION")
 	}
 	if *quiet && e.lines {
-		return e.usageErr("-q cannot be used with -l; see 'jev grep'")
+		return e.usageErr("-q cannot be used with -l; see 'jev-cli grep'")
 	}
 	ins, err := instructions(pos[0], *isJSON)
 	if err != nil {

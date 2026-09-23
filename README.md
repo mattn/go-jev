@@ -2,7 +2,7 @@
 
 Go SDK for [TypeSafe Jev](https://docs.typesafe.ai/), a decision-only model
 that returns typed answers (yes/no probability, choice, score) instead of
-text. Comes with `jev`, a command-line tool built on it for UNIX pipelines.
+text. Comes with `jev-cli`, a command-line tool built on it for UNIX pipelines.
 
 ## Install
 
@@ -73,51 +73,51 @@ c := jev.NewClient(jev.WithURL(jev.Endpoint("localhost:8080")))
 ## Command-line tool
 
 ```sh
-go install github.com/mattn/go-jev/cmd/jev@latest
+go install github.com/mattn/go-jev/cmd/jev-cli@latest
 export TYPESAFE_API_KEY=...
 ```
 
 ```sh
 # yes/no → probability 0..1
-echo 'Help! My payouts have been failing for 3 days.' | jev noul 'Does this convey urgency?'
+echo 'Help! My payouts have been failing for 3 days.' | jev-cli noul 'Does this convey urgency?'
 # 0.95
 
 # pick one option (name or name=description) → chosen option
 echo 'Help! My payouts have been failing for 3 days.' |
-  jev choice 'Which team should handle this?' \
+  jev-cli choice 'Which team should handle this?' \
     billing='Payments, invoicing, refunds' technical='Bugs, outages, integrations' sales
 # billing
 
 # rate on ordered levels (lowest first) → probability-weighted score
-jev score -s 'This is the third time!' 'How frustrated is the customer?' Calm Frustrated 'Very angry'
+jev-cli score -s 'This is the third time!' 'How frustrated is the customer?' Calm Frustrated 'Very angry'
 # 1.05
 
 # yes/no as exit status
-if jev noul -q 'Is this spam?' < mail.txt; then mv mail.txt spam/; fi
+if jev-cli noul -q 'Is this spam?' < mail.txt; then mv mail.txt spam/; fi
 
 # one state per line → answer<TAB>line, in input order, 4 requests at a time
-jev choice -l 'いま何を飲む？' コーヒー ビール 紅茶 < scenes.txt
+jev-cli choice -l 'いま何を飲む？' コーヒー ビール 紅茶 < scenes.txt
 # ビール	金曜の夜、友人と居酒屋
 # コーヒー	月曜の朝、出社前
 
 # grep by meaning (-v invert, -p prefix probability, -t threshold)
-jev grep 'Is the customer complaining?' < reviews.txt
+jev-cli grep 'Is the customer complaining?' < reviews.txt
 
 # several questions in one request → answers JSON
-jev ask '{"urgent":{"type":"noul","instructions":"Urgent?"},
+jev-cli ask '{"urgent":{"type":"noul","instructions":"Urgent?"},
           "team":{"type":"choice","instructions":"Team?","criteria":{"billing":null,"technical":null}}}' < ticket.txt
-jev ask @questions.json < ticket.txt | jq .team.choice
+jev-cli ask @questions.json < ticket.txt | jq .team.choice
 ```
 
 ### Commands
 
 | Command | Prints |
 |---|---|
-| `jev noul QUESTION` | probability that the answer is yes (`-true`/`-false` describe each side, `-q` exit status only, `-t` threshold) |
-| `jev choice QUESTION OPTION...` | the chosen option (`-c` takes a JSON object or array instead) |
-| `jev score QUESTION LEVEL...` | the weighted score (`-c` takes a JSON array instead) |
-| `jev grep QUESTION` | stdin lines whose answer is yes |
-| `jev ask QUESTIONS` | the `answers` object for a [questions map](https://docs.typesafe.ai/api.md) (`-raw` for the whole response) |
+| `jev-cli noul QUESTION` | probability that the answer is yes (`-true`/`-false` describe each side, `-q` exit status only, `-t` threshold) |
+| `jev-cli choice QUESTION OPTION...` | the chosen option (`-c` takes a JSON object or array instead) |
+| `jev-cli score QUESTION LEVEL...` | the weighted score (`-c` takes a JSON array instead) |
+| `jev-cli grep QUESTION` | stdin lines whose answer is yes |
+| `jev-cli ask QUESTIONS` | the `answers` object for a [questions map](https://docs.typesafe.ai/api.md) (`-raw` for the whole response) |
 
 Common flags (can appear anywhere; `--` ends flags):
 
@@ -144,14 +144,14 @@ With `-l`, a failed line is reported on stderr and the rest continue.
 | `JEV_API_URL` | `https://api.typesafe.ai/v1/systemone` |
 | `JEV_TIMEOUT` | `60` (seconds) |
 
-The `jev` command reads these and passes them to the client; flags
+The `jev-cli` command reads these and passes them to the client; flags
 (`-model`, `-url`, `-timeout`) override them. They match
 [sqlite3-jev](https://github.com/mattn/sqlite3-jev). A bare host
 such as `localhost:8080` expands to `http://localhost:8080/v1/systemone`, so a
 local [tensai](https://github.com/mattn/tensai) server works as is:
 
 ```sh
-JEV_API_URL=localhost:8080 jev choice -s '金曜の夜、友人と居酒屋' 'いま何を飲む？' コーヒー ビール 紅茶
+JEV_API_URL=localhost:8080 jev-cli choice -s '金曜の夜、友人と居酒屋' 'いま何を飲む？' コーヒー ビール 紅茶
 ```
 
 ## License
