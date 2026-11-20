@@ -1,5 +1,7 @@
 # go-jev
 
+[![Featured on JevMade](https://jevmade.com/badges/featured-on-jevmade-dark.svg)](https://jevmade.com/e/go-jev)
+
 Go SDK for [TypeSafe Jev](https://docs.typesafe.ai/), a decision-only model
 that returns typed answers (yes/no probability, choice, score) instead of
 text. Comes with `jev-cli`, a command-line tool built on it for UNIX pipelines.
